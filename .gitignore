@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MkDocs build output
+site/
+
+# Generated benchmark report
+benchmark-report.md
+
+.DS_Store

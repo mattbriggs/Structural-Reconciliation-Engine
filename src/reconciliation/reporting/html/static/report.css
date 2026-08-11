@@ -1,0 +1,41 @@
+/* Self-contained report styles. Status is never conveyed by color alone
+   (REQ-239): each status also carries a textual symbol and its name. Focus
+   outlines are preserved for keyboard operability (REQ-238). */
+:root {
+  --fg: #1a1a1a;
+  --muted: #555;
+  --border: #cccccc;
+  --bg-alt: #f4f4f4;
+}
+* { box-sizing: border-box; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--fg);
+  margin: 0;
+  padding: 1.5rem;
+  line-height: 1.5;
+}
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.2rem; border-bottom: 2px solid var(--border); padding-bottom: 0.25rem; }
+header .meta, .summary { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+dl.meta div, dl.summary div { display: flex; gap: 0.4rem; }
+dl dt { font-weight: 600; color: var(--muted); }
+dl dd { margin: 0; }
+nav form { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+nav label { font-weight: 600; }
+table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+caption { text-align: left; color: var(--muted); padding-bottom: 0.3rem; }
+th, td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+thead th { background: var(--bg-alt); }
+tbody tr:nth-child(4n+1), tbody tr:nth-child(4n+2) { background: #fbfbfb; }
+.status { display: inline-flex; gap: 0.35rem; align-items: baseline; font-weight: 600; }
+.status__symbol { font-family: monospace; border: 1px solid var(--border); border-radius: 3px; padding: 0 0.25rem; }
+.review-flag { display: inline-block; margin-left: 0.4rem; font-weight: 700; text-decoration: underline; }
+.node-id { font-family: monospace; }
+.label { display: block; color: var(--fg); }
+.path { display: block; color: var(--muted); font-size: 0.85em; font-family: monospace; }
+.detail-row td { background: #fafafa; color: var(--muted); }
+.evidence, .exemption, .message { margin: 0.2rem 0; }
+:focus { outline: 3px solid #1a73e8; outline-offset: 1px; }
+details summary { cursor: pointer; font-weight: 600; }
+[hidden] { display: none !important; }

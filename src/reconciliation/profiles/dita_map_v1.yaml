@@ -1,0 +1,83 @@
+# DITA map reference profile bundle (dita-map-v1).
+#
+# A version-controlled artifact (REQ-228) tuned for source-to-locale DITA map
+# comparison. Identity is driven by locale-stable signals (id/keys/href), which
+# the DITA adapter folds into the canonical `id` property; translated
+# navigation titles are never treated as authoritative identity (REQ-113).
+bundle_id: dita-map-v1
+version: v1
+
+normalization:
+  profile_id: dita-map-normalization
+  version: v1
+  collapse_whitespace: true
+  ignore_attribute_order: true
+  # Processing/audit attributes that must not affect content comparison.
+  nonsemantic_metadata_keys: ["class", "ditaarch:DITAArchVersion", "domains"]
+  # Never alter locale-stable identity references.
+  preserve_property_keys: ["keys", "href"]
+
+matching:
+  profile_id: dita-map-matching
+  version: v1
+  evidence_priority:
+    - PERSISTENT_ID
+    - SEMANTIC_SIGNATURE
+    - NORMALIZED_LABEL
+    - WEIGHTED_SIMILARITY
+    - ANCESTOR_CONTEXT
+  feature_weights:
+    - { feature: PERSISTENT_ID, weight: 0.5 }
+    - { feature: SEMANTIC_SIGNATURE, weight: 0.4 }
+    - { feature: NORMALIZED_LABEL, weight: 0.3 }
+    - { feature: WEIGHTED_SIMILARITY, weight: 0.2 }
+  authoritative_id_features: ["PERSISTENT_ID"]
+  hard_constraint_node_type: true
+  match_threshold: 0.6
+  probable_threshold: 0.4
+  ambiguity_margin: 0.05
+  # Translated navtitles must not be assumed lexically similar across locales.
+  disable_similarity_for_translatable: true
+  tie_break_keys: ["source_node_ref", "target_node_ref"]
+  calibration:
+    calibrated: false
+
+alignment:
+  profile_id: dita-map-alignment
+  version: v1
+  strategy: LCS
+  default_order_semantics: ORDERED
+  order_semantics_by_type:
+    # Reltables and their rows are not order-significant.
+    reltable: UNORDERED
+  use_anchor_partitioning: true
+
+operation:
+  profile_id: dita-map-operations
+  version: v1
+  enabled_operations: ["MATCH", "INSERT", "DELETE", "UPDATE", "MOVE", "REORDER"]
+  move_confidence_threshold: 0.75
+  operation_thresholds:
+    - { dimension: OPERATION, value: 0.75 }
+
+suppression:
+  profile_id: dita-map-suppression
+  version: v1
+  independent_defect_check: true
+  rules:
+    - rule_id: insert-downstream-position-v1
+      root_operation: INSERT
+      effect_category: DOWNSTREAM_POSITION_CHANGED
+      threshold: 0.6
+    - rule_id: delete-downstream-position-v1
+      root_operation: DELETE
+      effect_category: DOWNSTREAM_POSITION_CHANGED
+      threshold: 0.6
+    - rule_id: move-descendant-path-v1
+      root_operation: MOVE
+      effect_category: DESCENDANT_PATH_CHANGED
+      threshold: 0.7
+    - rule_id: reorder-position-v1
+      root_operation: REORDER
+      effect_category: DOWNSTREAM_POSITION_CHANGED
+      threshold: 0.6

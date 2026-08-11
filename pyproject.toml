@@ -1,0 +1,109 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "structural-reconciliation"
+description = "Confidence-aware structural reconciliation engine for source-to-locale XML validation."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Structural Reconciliation Engine" }]
+dynamic = ["version"]
+dependencies = [
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "structlog>=24.1",
+    "typing-extensions>=4.10",
+]
+
+[project.optional-dependencies]
+xml = ["lxml>=5.1"]
+api = ["fastapi>=0.110", "uvicorn>=0.29"]
+cli = ["typer>=0.12"]
+reporting = ["jinja2>=3.1"]
+persistence = ["sqlalchemy>=2.0"]
+yaml = ["pyyaml>=6.0"]
+all = [
+    "lxml>=5.1",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "typer>=0.12",
+    "jinja2>=3.1",
+    "sqlalchemy>=2.0",
+    "pyyaml>=6.0",
+]
+dev = [
+    "pytest>=8.1",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.4",
+    "mypy>=1.9",
+]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
+]
+
+[project.scripts]
+reconcile-localization = "reconciliation.delivery.cli.app:main"
+
+[tool.hatch.version]
+path = "src/reconciliation/version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reconciliation"]
+artifacts = ["*.yaml", "*.html.j2", "*.css", "*.js"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+# N818: exception names need not end in "Error" (our taxonomy is deliberate).
+# UP042: `str, Enum` is intentional for JSON-friendly enums across Pydantic.
+# RUF002: en dashes in docstrings encode SRS requirement ranges (REQ-165–170).
+ignore = ["N818", "UP042", "RUF002"]
+
+[tool.ruff.lint.per-file-ignores]
+# E501: inline XML/YAML fixtures in tests are naturally long.
+"tests/**" = ["N802", "N803", "N806", "N817", "E501"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["reconciliation"]
+mypy_path = "src"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["lxml.*", "yaml.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "acceptance: SRS acceptance-criteria traceability tests",
+    "property: Hypothesis property/invariant tests",
+    "security: security hardening tests",
+    "performance: performance and scalability tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/reconciliation"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+]

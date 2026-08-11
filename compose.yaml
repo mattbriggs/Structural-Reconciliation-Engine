@@ -1,0 +1,28 @@
+# Optional single-node deployment of the reconciliation API.
+# SQLite is used for local/development single-node use; production database
+# selection remains an infrastructure decision.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: structural-reconciliation:local
+    ports:
+      - "8000:8000"
+    environment:
+      # Secure defaults: redact content in logs, do not expose filesystem paths.
+      SRE_REDACT_CONTENT: "true"
+      SRE_EXPOSE_FILESYSTEM_PATHS: "false"
+      SRE_LOG_JSON: "true"
+      SRE_DATABASE_URL: "sqlite+pysqlite:////var/lib/reconciliation/results.db"
+      SRE_ARTIFACT_DIR: "/var/lib/reconciliation/artifacts"
+    volumes:
+      - reconciliation-data:/var/lib/reconciliation
+    restart: unless-stopped
+    # Drop privileges further; the image already runs as a non-root user.
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  reconciliation-data:

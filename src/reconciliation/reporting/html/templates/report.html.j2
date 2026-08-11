@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Localization Reconciliation Report — {{ report.job_id }}</title>
+  <style>{{ embedded_css }}</style>
+</head>
+<body>
+  <header>
+    <h1>Localization Reconciliation Report</h1>
+    <dl class="meta">
+      <div><dt>Job</dt><dd>{{ report.job_id }}</dd></div>
+      <div><dt>Locale</dt><dd>{{ report.locale }}</dd></div>
+      <div><dt>Authoritative side</dt><dd>{{ report.authoritative_side }}</dd></div>
+      <div><dt>Engine</dt><dd>{{ report.versions.engine_version }}</dd></div>
+      <div><dt>Matching profile</dt><dd>{{ report.versions.matching_profile_version }}</dd></div>
+    </dl>
+  </header>
+
+  <main>
+    <section aria-labelledby="summary-heading">
+      <h2 id="summary-heading">Summary</h2>
+      <dl class="summary">
+        {% for status, count in report.summary.status_counts.items() %}
+        <div><dt>{{ status }}</dt><dd>{{ count }}</dd></div>
+        {% endfor %}
+        <div><dt>Direct issues</dt><dd>{{ report.summary.direct_issue_count }}</dd></div>
+        <div><dt>Suppressed effects</dt><dd>{{ report.summary.suppressed_effect_count }}</dd></div>
+      </dl>
+    </section>
+
+    <section aria-labelledby="rootcause-heading">
+      <h2 id="rootcause-heading">Root causes</h2>
+      {% if report.root_causes %}
+      <ul class="root-causes">
+        {% for rc in report.root_causes %}
+        <li><strong>{{ rc.type }}</strong> ({{ rc.operation_id }}) — confidence {{ rc.confidence }}
+          {% if rc.evidence_codes %}<span class="evidence">[{{ rc.evidence_codes | join(", ") }}]</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No structural root causes detected.</p>
+      {% endif %}
+    </section>
+
+    <nav aria-label="Issue filters">
+      <form id="filters">
+        <label for="status-filter">Filter by status</label>
+        <select id="status-filter" name="status">
+          <option value="">All statuses</option>
+          {% for status in report.summary.status_counts.keys() %}
+          <option value="{{ status }}">{{ status }}</option>
+          {% endfor %}
+        </select>
+        <label for="text-filter">Search</label>
+        <input id="text-filter" name="text" type="search" placeholder="id, label, or message">
+      </form>
+    </nav>
+
+    <section aria-labelledby="issues-heading">
+      <h2 id="issues-heading">Issues</h2>
+      <table id="issues-table">
+        <caption>Reported source-to-locale correspondences and issues</caption>
+        <thead>
+          <tr>
+            <th scope="col">Status</th>
+            <th scope="col">Source</th>
+            <th scope="col">Locale</th>
+            <th scope="col">Match confidence</th>
+            <th scope="col">Operation confidence</th>
+            <th scope="col">Repair confidence</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for issue in report.issues %}
+          <tr data-status="{{ issue.status }}"
+              data-search="{{ (issue.source_node_id or '') ~ ' ' ~ (issue.locale_node_id or '') ~ ' ' ~ (issue.source_label or '') ~ ' ' ~ (issue.locale_label or '') ~ ' ' ~ (issue.message or '') }}">
+            <th scope="row">
+              <span class="status status--{{ issue.status | lower }}">
+                <span class="status__symbol" aria-hidden="true">{{ issue.status_symbol }}</span>
+                <span class="status__text">{{ issue.status }}</span>
+              </span>
+              {% if issue.needs_review %}<span class="review-flag">Human review required</span>{% endif %}
+            </th>
+            <td>
+              <span class="node-id">{{ issue.source_node_id or "—" }}</span>
+              {% if issue.source_label %}<span class="label">{{ issue.source_label }}</span>{% endif %}
+              {% if issue.source_path %}<span class="path">{{ issue.source_path }}</span>{% endif %}
+            </td>
+            <td>
+              <span class="node-id">{{ issue.locale_node_id or "—" }}</span>
+              {% if issue.locale_label %}<span class="label">{{ issue.locale_label }}</span>{% endif %}
+              {% if issue.locale_path %}<span class="path">{{ issue.locale_path }}</span>{% endif %}
+            </td>
+            <td>{{ issue.match_confidence }}</td>
+            <td>{{ issue.operation_confidence }}</td>
+            <td>{{ issue.repair_confidence }}</td>
+            <td>{{ issue.recommended_action or "—" }}</td>
+          </tr>
+          {% if issue.evidence_codes or issue.message or issue.policy_exemption %}
+          <tr class="detail-row" data-status="{{ issue.status }}">
+            <td colspan="7">
+              {% if issue.message %}<p class="message">{{ issue.message }}</p>{% endif %}
+              {% if issue.evidence_codes %}<p class="evidence">Evidence: {{ issue.evidence_codes | join(", ") }}</p>{% endif %}
+              {% if issue.policy_exemption %}<p class="exemption">Policy exemption: {{ issue.policy_exemption }}</p>{% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section aria-labelledby="recs-heading">
+      <h2 id="recs-heading">Recommendations</h2>
+      {% if report.recommendations %}
+      <ul class="recommendations">
+        {% for rec in report.recommendations %}
+        <li>
+          <strong>{{ rec.operation }}</strong> for issue {{ rec.issue_id }} —
+          repair confidence {{ rec.repair_confidence }},
+          executable: {{ "yes" if rec.executable else "no" }}.
+          <span class="changes">Changes: {{ rec.changes | join(", ") }}.</span>
+          <details>
+            <summary>Preconditions</summary>
+            <ul>{% for pre in rec.preconditions %}<li>{{ pre }}</li>{% endfor %}</ul>
+          </details>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No recommendations generated.</p>
+      {% endif %}
+    </section>
+
+    <section aria-labelledby="suppressed-heading">
+      <h2 id="suppressed-heading">Suppressed effects ({{ report.suppressed | length }})</h2>
+      <details>
+        <summary>Reveal suppressed derived effects</summary>
+        {% if report.suppressed %}
+        <ul class="suppressed">
+          {% for s in report.suppressed %}
+          <li>{{ s.category }} — root {{ s.root_operation_id }}, rule {{ s.suppression_rule }}, confidence {{ s.confidence }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p>No effects were suppressed.</p>
+        {% endif %}
+      </details>
+    </section>
+  </main>
+
+  <script>{{ embedded_js }}</script>
+</body>
+</html>

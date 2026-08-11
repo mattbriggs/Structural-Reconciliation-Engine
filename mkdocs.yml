@@ -1,0 +1,69 @@
+site_name: Structural Reconciliation Engine
+site_description: Confidence-aware structural reconciliation for source-to-locale XML validation.
+docs_dir: docs
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            show_root_heading: true
+            show_source: false
+            members_order: source
+            docstring_style: sphinx
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Layers & dependency rules: architecture/layers.md
+      - Contracts: architecture/contracts.md
+      - Determinism: architecture/determinism.md
+      - Security: architecture/security.md
+  - Design:
+      - Matching: design/matching.md
+      - Alignment: design/alignment.md
+      - Classification: design/classification.md
+      - Root-cause analysis: design/root-cause.md
+      - Suppression: design/suppression.md
+      - Confidence: design/confidence.md
+      - Reporting: design/reporting.md
+  - Profiles:
+      - Authoring: profiles/authoring.md
+      - DITA map v1: profiles/dita-map-v1.md
+  - API reference:
+      - Python: api/python.md
+      - HTTP: api/http.md
+      - CLI: api/cli.md
+  - Operations:
+      - Configuration: operations/configuration.md
+      - Observability: operations/observability.md
+      - Deployment: operations/deployment.md
+  - Development:
+      - Testing: development/testing.md
+      - Extension points: development/extension-points.md
+      - Traceability: development/traceability.md
