@@ -18,12 +18,14 @@ from typing import Protocol
 from reconciliation.core.alignment.aligner import TreeAlignerService
 from reconciliation.core.causality.analyzer import RootCauseAnalyzerService
 from reconciliation.core.classification.classifier import StructuralOperationClassifierService
+from reconciliation.core.contracts.alignment import AlignmentResult
 from reconciliation.core.contracts.commands import ReconcileTreesCommand
 from reconciliation.core.contracts.diagnostics import (
     EngineDiagnostic,
     PipelineStage,
     Severity,
 )
+from reconciliation.core.contracts.profiles import AlignmentStrategy
 from reconciliation.core.contracts.results import ProfileVersions, ReconciliationResult
 from reconciliation.core.errors import ResourceLimitExceededError
 from reconciliation.core.evidence.extractor import IdentityEvidenceExtractorService
@@ -157,6 +159,7 @@ class DefaultReconciliationEngine:
         timer.record(
             PipelineStage.ALIGNMENT, start, result_count=len(alignment.regions)
         )
+        diagnostics.extend(self._alignment_diagnostics(command, alignment))
 
         # Classification (REQ-061-072).
         start = time.perf_counter()
@@ -228,6 +231,54 @@ class DefaultReconciliationEngine:
         return diagnostics
 
     @staticmethod
+    def _alignment_diagnostics(
+        command: ReconcileTreesCommand, alignment: AlignmentResult
+    ) -> list[EngineDiagnostic]:
+        """Report unresolved regions and any unhonored alignment strategy.
+
+        Unresolved alignment is a real outcome, not an internal detail: saying
+        "this region is not settled" is what keeps the engine from manufacturing
+        a structurally precise lie (REQ-058). Requesting an unimplemented
+        strategy is reported too, so the runtime never appears to honor more than
+        it does (REQ-055).
+        """
+        diagnostics: list[EngineDiagnostic] = []
+        if command.alignment_profile.strategy is not AlignmentStrategy.LCS:
+            diagnostics.append(
+                EngineDiagnostic(
+                    code="ALIGNMENT_STRATEGY_NOT_IMPLEMENTED",
+                    severity=Severity.WARNING,
+                    stage=PipelineStage.ALIGNMENT,
+                    message=(
+                        "requested alignment strategy is not implemented; "
+                        "longest-common-subsequence alignment was applied instead"
+                    ),
+                    metadata={
+                        "requested_strategy": command.alignment_profile.strategy.value,
+                        "applied_strategy": AlignmentStrategy.LCS.value,
+                    },
+                )
+            )
+        for region in alignment.unresolved_regions:
+            diagnostics.append(
+                EngineDiagnostic(
+                    code="UNRESOLVED_ALIGNMENT_REGION",
+                    severity=Severity.WARNING,
+                    stage=PipelineStage.ALIGNMENT,
+                    message=(
+                        "sibling region holds correspondences that are viable but not "
+                        "uniquely resolvable; presence defects are withheld there"
+                    ),
+                    metadata={
+                        "region_id": region.region_id,
+                        "unresolved_source_count": len(region.unresolved_source_refs),
+                        "unresolved_target_count": len(region.unresolved_target_refs),
+                    },
+                )
+            )
+        return diagnostics
+
+    @staticmethod
     def _profile_versions(command: ReconcileTreesCommand) -> ProfileVersions:
         return ProfileVersions(
             engine_version=ENGINE_VERSION,
@@ -245,7 +296,6 @@ class DefaultReconciliationEngine:
         diagnostics: list[EngineDiagnostic],
         timer: StageTimer,
     ) -> ReconciliationResult:
-        from reconciliation.core.contracts.alignment import AlignmentResult
         from reconciliation.core.contracts.causality import (
             CandidateExplanation,
             CausalOperationGraph,

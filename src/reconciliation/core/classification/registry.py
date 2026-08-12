@@ -9,12 +9,21 @@ orchestrating classifier concatenates and deterministically orders them.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Protocol
 
-from reconciliation.core.contracts.alignment import AlignmentResult
+from reconciliation.core.contracts.alignment import (
+    AlignedPair,
+    AlignedRegion,
+    AlignmentEdgeKind,
+    AlignmentResult,
+)
 from reconciliation.core.contracts.matches import MatchGraph, MatchState
 from reconciliation.core.contracts.operations import StructuralOperation
-from reconciliation.core.contracts.profiles import OperationProfile
+from reconciliation.core.contracts.profiles import (
+    OperationProfile,
+    UnresolvedPresencePolicy,
+)
 from reconciliation.core.contracts.tree import CanonicalTree, NodeRef
 
 
@@ -93,6 +102,69 @@ class ClassificationContext:
     def moved_target_refs(self) -> frozenset[NodeRef]:
         """Target refs participating in an above-threshold MOVE."""
         return frozenset(t for _s, t in self.move_pairs())
+
+    # -- Unresolved alignment (REQ-058) ------------------------------------
+
+    @cached_property
+    def ambiguous_source_refs(self) -> frozenset[NodeRef]:
+        """Source refs participating in ambiguous candidates but no confirmed match.
+
+        Cached because every unmatched position consults it; recomputing per
+        position would make classification quadratic in the candidate count.
+        """
+        confirmed = {c.source_node_ref for c in self.graph.confirmed}
+        return frozenset(
+            c.source_node_ref
+            for c in self.graph.ambiguous
+            if c.source_node_ref not in confirmed
+        )
+
+    @cached_property
+    def ambiguous_target_refs(self) -> frozenset[NodeRef]:
+        """Target refs participating in ambiguous candidates but no confirmed match."""
+        confirmed = {c.target_node_ref for c in self.graph.confirmed}
+        return frozenset(
+            c.target_node_ref
+            for c in self.graph.ambiguous
+            if c.target_node_ref not in confirmed
+        )
+
+    def presence_suppressed_region(self, region: AlignedRegion) -> bool:
+        """True when the profile withholds presence operations for a whole region.
+
+        Only the ``SUPPRESS_UNRESOLVED_REGIONS`` policy is that cautious; the
+        default judges node by node so a real defect beside an ambiguity is
+        still reported.
+        """
+        return (
+            self.profile.unresolved_presence_policy
+            is UnresolvedPresencePolicy.SUPPRESS_UNRESOLVED_REGIONS
+            and region.unresolved
+        )
+
+    def presence_suppressed_pair(self, pair: AlignedPair) -> bool:
+        """True when a position must not be reported as INSERT/DELETE (REQ-058).
+
+        ``INSERT``/``DELETE`` mean "no viable correspondence exists". A position
+        the aligner left unresolved, or whose node participates in ambiguous
+        candidates, has a viable correspondence that is merely unresolvable, so
+        asserting absence would be a false positive. The match-graph check is a
+        deliberate second barrier: it holds even for an injected aligner that
+        never marks unresolved positions.
+        """
+        if self.profile.unresolved_presence_policy is UnresolvedPresencePolicy.EMIT_ALL:
+            return False
+        if pair.is_unresolved:
+            return True
+        if (
+            pair.kind is AlignmentEdgeKind.SOURCE_ONLY
+            and pair.source_node_ref in self.ambiguous_source_refs
+        ):
+            return True
+        return (
+            pair.kind is AlignmentEdgeKind.TARGET_ONLY
+            and pair.target_node_ref in self.ambiguous_target_refs
+        )
 
 
 class OperationClassifier(Protocol):

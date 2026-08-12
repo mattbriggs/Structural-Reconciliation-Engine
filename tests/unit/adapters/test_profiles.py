@@ -17,6 +17,17 @@ def test_load_named_dita_bundle() -> None:
     bundle.validate_consistency()
 
 
+def test_load_named_generic_bundles() -> None:
+    for name, bundle_id in (
+        ("generic_xml_v1", "generic-xml-v1"),
+        ("generic_json_v1", "generic-json-v1"),
+        ("generic_yaml_v1", "generic-yaml-v1"),
+    ):
+        bundle = load_named_bundle(name)
+        assert bundle.bundle_id == bundle_id
+        bundle.validate_consistency()
+
+
 def test_missing_named_bundle_raises() -> None:
     with pytest.raises(InvalidProfileError):
         load_named_bundle("does_not_exist")

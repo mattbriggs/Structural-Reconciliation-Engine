@@ -156,6 +156,10 @@ class LocalizationSummary(StrictModel):
     :ivar node_counts: Node-category counts (REQ-157).
     :ivar direct_issue_count: Count of primary (non-suppressed) issues (REQ-159).
     :ivar suppressed_effect_count: Count of suppressed derived effects (REQ-159).
+    :ivar unresolved_region_count: Count of sibling regions the core left
+        unresolved because correspondence was viable but not uniquely
+        resolvable (REQ-058). Reported so uncertainty is visible as uncertainty
+        rather than inflated into presence defects.
     """
 
     status_counts: dict[str, int] = Field(default_factory=dict)
@@ -164,6 +168,7 @@ class LocalizationSummary(StrictModel):
     node_counts: NodeCounts = NodeCounts()
     direct_issue_count: int = 0
     suppressed_effect_count: int = 0
+    unresolved_region_count: int = 0
 
 
 class LocalizationValidationResult(StrictModel):

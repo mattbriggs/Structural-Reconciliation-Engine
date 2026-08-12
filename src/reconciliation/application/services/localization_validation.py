@@ -281,7 +281,46 @@ class LocalizationValidationService:
                     )
                 )
 
-        return tuple(issues)
+        return self._without_contradictory_presence(tuple(issues), result)
+
+    @staticmethod
+    def _without_contradictory_presence(
+        issues: tuple[LocalizationIssue, ...], result: ReconciliationResult
+    ) -> tuple[LocalizationIssue, ...]:
+        """Drop presence statuses that contradict an ambiguity (REQ-058, REQ-090).
+
+        Ambiguous correspondence dominates conflicting presence statuses: a node
+        held in an unresolved correspondence must never be reported as
+        ``MISSING_IN_LOCALE`` or ``EXTRA_IN_LOCALE`` as well, because that
+        inflates one uncertainty into several confident-looking defects.
+
+        The core already withholds those operations (REQ-058), so this normally
+        filters nothing. It is the second barrier: it also holds for a result
+        produced by an injected classifier or by the ``EMIT_ALL`` presence
+        policy. Those forced operations remain visible in the referenced core
+        result, which this layer never modifies (REQ-176).
+        """
+        ambiguous_sources = {
+            c.source_node_ref for c in result.match_graph.ambiguous
+        } | result.alignment.unresolved_source_refs
+        ambiguous_targets = {
+            c.target_node_ref for c in result.match_graph.ambiguous
+        } | result.alignment.unresolved_target_refs
+        kept: list[LocalizationIssue] = []
+        for issue in issues:
+            status = issue.localization_status
+            if (
+                status is LocalizationStatus.MISSING_IN_LOCALE
+                and issue.source_node_ref in ambiguous_sources
+            ):
+                continue
+            if (
+                status is LocalizationStatus.EXTRA_IN_LOCALE
+                and issue.locale_node_ref in ambiguous_targets
+            ):
+                continue
+            kept.append(issue)
+        return tuple(kept)
 
     def _presence_issue(
         self,
@@ -402,4 +441,5 @@ class LocalizationValidationService:
             node_counts=node_counts,
             direct_issue_count=len(issues),
             suppressed_effect_count=len(result.suppression.suppressed_effects),
+            unresolved_region_count=len(result.alignment.unresolved_region_ids),
         )

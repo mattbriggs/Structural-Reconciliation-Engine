@@ -1,18 +1,19 @@
 # Structural Reconciliation Engine
 
-Structural Reconciliation Engine is a confidence-aware Python core for comparing
-hierarchical semantic trees. It establishes logical node correspondence before
-diagnosing structural differences, so a single insert, delete, move, or reorder
-does not explode into a cascade of misleading positional mismatches.
+Structural Reconciliation Engine is a confidence-aware Python toolkit for
+comparing hierarchical semantic trees. It establishes logical node
+correspondence before diagnosing structural differences, so a single insert,
+delete, move, or reorder does not explode into a cascade of misleading
+positional mismatches.
 
-The first product target is source-to-locale XML validation for CCMS
-localization workflows, but the reusable core is deliberately domain neutral.
-Raw XML, DITA rules, CCMS access, reporting, persistence, and delivery concerns
-belong in adapter or application layers above `reconciliation.core`.
+The reusable core is deliberately domain neutral. Raw XML, JSON, YAML, DITA
+rules, reporting, persistence, and delivery concerns belong in adapter or
+application layers above `reconciliation.core`.
 
 ## Current Status
 
-This checkout currently contains the reusable in-memory reconciliation core:
+This checkout contains a reusable in-memory reconciliation core plus the first
+end-to-end XML/DITA localization workflow:
 
 - typed canonical tree, profile, command, result, evidence, match, alignment,
   operation, causality, suppression, diagnostic, and metric contracts
@@ -20,12 +21,41 @@ This checkout currently contains the reusable in-memory reconciliation core:
 - deterministic pipeline stages:
   `normalize -> evidence -> match -> align -> classify -> root-cause -> suppress`
 - validators for tree and profile invariants
-- unit and contract tests for the core boundary1
+- hardened XML parsing, generic XML-to-canonical adaptation, generic JSON/YAML
+  data-tree adapters, and a DITA map adapter
+- YAML-backed profile bundle loading plus packaged `dita-map-v1`,
+  `generic-xml-v1`, `generic-json-v1`, and `generic-yaml-v1` profiles
+- application orchestration, localization interpretation, reviewer decisions,
+  report generation, persistence ports/SQLite implementation, CLI, and FastAPI
+  delivery
+- unit, contract, integration, acceptance, property, security, performance, and
+  benchmark tests
 
-The project metadata already declares optional extras for XML, API, CLI,
-reporting, persistence, YAML, docs, and dev tooling. Those delivery layers are
-not present in this repository snapshot yet, so the supported public surface is
-the `reconciliation.core` package.
+The default document profile remains `dita-map-v1` because the first delivery
+workflow is source-to-locale XML validation. Generic XML, JSON, and YAML
+profiles are also registered and selectable by profile id.
+
+## Supported Input Shapes
+
+The core is tree-format agnostic: callers can build `CanonicalTree` objects
+from any rooted tree-like source and pass them directly to
+`reconciliation.core.DefaultReconciliationEngine`.
+
+Out-of-the-box document input support is narrower:
+
+| Input | Current support |
+|---|---|
+| Canonical trees | Supported directly by the core |
+| DITA map XML | Supported end-to-end through `dita-map-v1` |
+| Generic XML | Supported through `generic-xml-v1` |
+| JSON documents | Supported through `generic-json-v1` |
+| YAML documents | Supported through `generic-yaml-v1` |
+| YAML profile files | Supported for profile bundles |
+
+So, yes: the tool supports agnostic tree mapping. The core reconciles canonical
+trees, while the built-in adapters now map XML, JSON, and YAML syntax into that
+shared tree contract. JSON and YAML use shared `data:*` node types, with object
+or mapping order ignored by profile and array or sequence order preserved.
 
 ## Why It Exists
 
@@ -41,8 +71,8 @@ root causes, and keeps derived effects auditable through suppression results.
 ## Architecture
 
 The core consumes canonical trees and typed profiles. It performs no I/O and
-imports no XML, DITA, localization, web, persistence, reporting, or CCMS
-dependencies.
+imports no XML, JSON, YAML, DITA, localization, web, persistence, reporting, or
+delivery dependencies.
 
 ```text
 domain adapter
@@ -60,10 +90,17 @@ Key contracts:
 - `MatchingProfile`: identity evidence priority, thresholds, constraints, and
   calibration metadata
 - `AlignmentProfile`: sibling-order semantics and alignment strategy
-- `OperationProfile`: enabled structural operation vocabulary and thresholds
+- `OperationProfile`: enabled structural operation vocabulary, thresholds, and
+  whether unresolved correspondence may be reported as a presence defect
 - `SuppressionProfile`: cascade suppression rules
 - `ReconciliationResult`: match graph, alignment, operations, causality,
   suppression, diagnostics, metrics, and exact profile versions
+
+The result keeps three states apart: confirmed correspondence, confirmed
+absence, and unresolved ambiguity. `INSERT` and `DELETE` mean "no viable
+correspondence exists", so a node whose correspondence is viable but not
+uniquely resolvable is held as an unresolved alignment position instead of being
+reported as missing or extra. If the engine cannot know, it says uncertain.
 
 ## Requirements
 
@@ -84,14 +121,21 @@ source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
 
-Install optional extras only when working on those layers:
+The base install is the reusable core only. Install optional extras when working
+on those layers:
 
 ```bash
-python -m pip install -e ".[xml]"
-python -m pip install -e ".[api]"
-python -m pip install -e ".[reporting]"
-python -m pip install -e ".[all]"
+python -m pip install -e ".[xml]"        # XML/DITA adapters
+python -m pip install -e ".[cli]"        # reconcile-localization console script
+python -m pip install -e ".[api]"        # HTTP API
+python -m pip install -e ".[reporting]"  # HTML report renderer
+python -m pip install -e ".[all]"        # everything
 ```
+
+The `reconcile-localization` console script requires the `cli` extra, which
+carries typer plus the XML/DITA parser, YAML profile loader, and HTML renderer
+its default document-profile path composes. Run without that extra, the script
+exits with one line naming the missing dependency.
 
 ## Usage
 
@@ -189,6 +233,16 @@ The core independence contract is important: importing or exercising
 
 ```text
 src/reconciliation/
+  adapters/
+    data_tree/        shared JSON/YAML parsed-data canonicalizer
+    json/             generic JSON parser and document adapter
+    xml/              hardened XML parser and generic XML adapter
+    yaml/             generic YAML parser and document adapter
+    dita/             DITA map adapter and identity normalization
+  application/
+    orchestration/    comparison job service and profile registry
+    services/         localization, policy, recommendations, reviewer decisions
+    ports/            adapter, repository, artifact, and job ports
   core/
     alignment/        sibling sequence alignment
     causality/        root-cause explanation graph
@@ -200,16 +254,31 @@ src/reconciliation/
     normalization/    canonical tree normalization
     suppression/      cascade suppression
     validation/       tree and profile validation
+  delivery/
+    api/              FastAPI app and routers
+    cli/              reconcile-localization command
+  infrastructure/
+    persistence/      SQLite repositories
+    jobs/             in-memory job execution
+  profiles/           YAML profile bundle contracts and packaged profiles
+  reporting/          JSON/CSV/summary/HTML renderers
   version.py          package and contract version manifest
 
 tests/
+  acceptance/         SRS acceptance criteria and workflow tests
+  benchmark/          quality and report benchmark tests
   contract/           architectural boundary tests
-  unit/               contract and core behavior tests
+  integration/        adapter-to-engine pipeline tests
+  performance/        scalability and resource tests
+  property/           invariant/property tests
+  security/           parser and hardening tests
+  unit/               contract, core, adapter, app, delivery, reporting tests
   builders.py         test-only canonical tree/profile builders
 
 _design/
   srs-025-SRS.md
   SRE_025-Implementation-plan.md
+  2026-08-11-Implementation-Note1.md
 ```
 
 ## Design Documents
@@ -219,6 +288,7 @@ implementation plan:
 
 - `_design/srs-025-SRS.md`
 - `_design/SRE_025-Implementation-plan.md`
+- `_design/2026-08-11-Implementation-Note1.md`
 
 Use those documents when extending the operation vocabulary, adding adapters, or
 building delivery/reporting layers so the domain-neutral core boundary remains

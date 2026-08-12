@@ -19,8 +19,23 @@ dependencies = [
 
 [project.optional-dependencies]
 xml = ["lxml>=5.1"]
-api = ["fastapi>=0.110", "uvicorn>=0.29"]
-cli = ["typer>=0.12"]
+# The default API state composes the built-in profile registry, SQLite
+# repositories, and report renderers.
+api = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "lxml>=5.1",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "sqlalchemy>=2.0",
+]
+# The base install is the reusable core only. `cli` therefore carries every
+# dependency the `reconcile-localization` entry point actually needs: typer, plus
+# the XML/DITA parser, YAML profile loader, and HTML renderer its default
+# document-profile path composes. The entry point stays declared here (a console
+# script cannot be conditional) but fails with an actionable message rather than
+# an import traceback when the extra is absent.
+cli = ["typer>=0.12", "lxml>=5.1", "pyyaml>=6.0", "jinja2>=3.1"]
 reporting = ["jinja2>=3.1"]
 persistence = ["sqlalchemy>=2.0"]
 yaml = ["pyyaml>=6.0"]
@@ -46,7 +61,8 @@ docs = [
 ]
 
 [project.scripts]
-reconcile-localization = "reconciliation.delivery.cli.app:main"
+# Requires the `cli` extra; see the note on optional-dependencies above.
+reconcile-localization = "reconciliation.delivery.cli.entry:main"
 
 [tool.hatch.version]
 path = "src/reconciliation/version.py"

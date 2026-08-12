@@ -113,6 +113,7 @@ def build_view_model(
             "node_counts": result.summary.node_counts.model_dump(mode="json"),
             "direct_issue_count": result.summary.direct_issue_count,
             "suppressed_effect_count": result.summary.suppressed_effect_count,
+            "unresolved_region_count": result.summary.unresolved_region_count,
         },
         "root_causes": root_causes,
         "issues": issues,
