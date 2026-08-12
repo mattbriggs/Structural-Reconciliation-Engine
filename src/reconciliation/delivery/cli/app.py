@@ -4,6 +4,10 @@ Adapts two documents, runs the pipeline, writes requested artifacts, and exits
 with a code determined by the configurable :class:`ExitCodePolicy` — separating
 technical failures from detected content findings. ``--machine-errors`` emits a
 structured JSON error for automated callers (REQ-185).
+
+This module requires the ``cli`` extra. The console script goes through
+:mod:`reconciliation.delivery.cli.entry`, which reports a missing extra as one
+actionable message rather than an import traceback.
 """
 
 from __future__ import annotations
@@ -155,8 +159,3 @@ def reconcile(
         treat_findings_as_failure=treat_findings_as_failure,
     )
     raise typer.Exit(code)
-
-
-def main() -> None:
-    """Console-script entry point."""
-    app()

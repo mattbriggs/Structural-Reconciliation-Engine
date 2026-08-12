@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 from pathlib import Path
 
+import pytest
+
+from reconciliation.delivery.cli import app as cli_app
+from reconciliation.delivery.cli import entry
 from reconciliation.delivery.cli.app import run_cli
 
 SRC = '<map><topicref keys="intro" href="i.dita"/><topicref keys="gone" href="g.dita"/></map>'
@@ -76,3 +81,19 @@ def test_unknown_profile_is_technical_failure(tmp_path: Path) -> None:
     )
     assert code == 1
     assert json.loads(out.getvalue())["error"]["code"] == "UNSUPPORTED_CONTRACT"
+
+
+def test_entry_point_reports_a_missing_cli_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The console script is declared on the base install but the CLI needs the
+    # `cli` extra; a missing dependency must read as one actionable line.
+    monkeypatch.setitem(sys.modules, "reconciliation.delivery.cli.app", None)
+    with pytest.raises(SystemExit) as excinfo:
+        entry.main()
+    assert "structural-reconciliation[cli]" in str(excinfo.value)
+
+
+def test_entry_point_delegates_to_the_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[bool] = []
+    monkeypatch.setattr(cli_app, "app", lambda: calls.append(True))
+    entry.main()
+    assert calls == [True]

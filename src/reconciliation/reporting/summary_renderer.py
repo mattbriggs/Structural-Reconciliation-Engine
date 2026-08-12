@@ -34,6 +34,7 @@ class SummaryRenderer:
             "node_counts": summary.node_counts.model_dump(mode="json"),
             "direct_issue_count": summary.direct_issue_count,
             "suppressed_effect_count": summary.suppressed_effect_count,
+            "unresolved_region_count": summary.unresolved_region_count,
             "rates": {
                 status: round(count / total, 6)
                 for status, count in summary.status_counts.items()

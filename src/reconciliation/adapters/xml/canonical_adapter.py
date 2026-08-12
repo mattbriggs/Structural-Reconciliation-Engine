@@ -16,6 +16,7 @@ from __future__ import annotations
 from lxml import etree
 
 from reconciliation.adapters.xml.errors import DocumentAdaptationError
+from reconciliation.adapters.xml.parser import SecureXmlParser, XmlSecurityLimits
 from reconciliation.core.contracts.tree import (
     CanonicalNode,
     CanonicalTree,
@@ -131,3 +132,23 @@ class GenericXmlAdapter:
             structural_properties=structural,
             source_location=location,
         )
+
+
+class GenericXmlDocumentAdapter:
+    """Parses and adapts generic XML content into a canonical tree."""
+
+    def __init__(
+        self,
+        *,
+        limits: XmlSecurityLimits | None = None,
+        contract_version: str = CANONICAL_TREE_CONTRACT_VERSION,
+    ) -> None:
+        self._parser = SecureXmlParser(limits)
+        self._adapter = GenericXmlAdapter(contract_version=contract_version)
+
+    def adapt_document(
+        self, data: str | bytes, *, tree_id: str, document_uri: str | None = None
+    ) -> CanonicalTree:
+        """Parse and adapt XML content into a validated canonical tree."""
+        root = self._parser.parse(data, document_uri=document_uri)
+        return self._adapter.adapt(root, tree_id=tree_id, document_uri=document_uri)

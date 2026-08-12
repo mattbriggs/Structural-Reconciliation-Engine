@@ -221,6 +221,13 @@ class AlignmentProfile(StrictModel):
     :ivar order_semantics_by_type: Per-node-type order semantics overrides.
     :ivar use_anchor_partitioning: Enable stable-anchor partitioning of large
         regions (REQ-057, REQ-198).
+
+    .. note::
+       The current aligner implements ``LCS`` only, and confirmed matches act as
+       its structural anchors implicitly, so ``use_anchor_partitioning`` is
+       advisory. Requesting an unimplemented ``strategy`` does not silently
+       change behavior: the engine emits an
+       ``ALIGNMENT_STRATEGY_NOT_IMPLEMENTED`` diagnostic and applies LCS.
     """
 
     profile_id: str = Field(min_length=1)
@@ -235,6 +242,30 @@ class AlignmentProfile(StrictModel):
         return self.order_semantics_by_type.get(node_type, self.default_order_semantics)
 
 
+class UnresolvedPresencePolicy(str, Enum):
+    """How presence operations behave where alignment is unresolved (REQ-058).
+
+    ``INSERT`` and ``DELETE`` mean "no viable correspondence exists". A node
+    that participates in ambiguous candidate correspondences has a viable
+    correspondence that is merely not uniquely resolvable, so asserting absence
+    for it would be a precise lie. This policy names the escape hatches
+    explicitly instead of leaving the behavior implicit:
+
+    - ``SUPPRESS_AMBIGUOUS_NODES`` (default): withhold INSERT/DELETE for nodes
+      participating in ambiguous candidates; other nodes in the same region are
+      still diagnosed, so a real defect beside an ambiguity is not swallowed.
+    - ``SUPPRESS_UNRESOLVED_REGIONS``: withhold INSERT/DELETE for every node in
+      a region containing any unresolved position — maximally cautious.
+    - ``EMIT_ALL``: treat unresolved positions as absent (pre-unresolved-path
+      behavior). Retained for callers that must have a total interpretation and
+      accept the false positives that come with it.
+    """
+
+    SUPPRESS_AMBIGUOUS_NODES = "SUPPRESS_AMBIGUOUS_NODES"
+    SUPPRESS_UNRESOLVED_REGIONS = "SUPPRESS_UNRESOLVED_REGIONS"
+    EMIT_ALL = "EMIT_ALL"
+
+
 class OperationProfile(StrictModel):
     """Enabled classifiers and operation-specific thresholds (REQ-061-072).
 
@@ -244,6 +275,8 @@ class OperationProfile(StrictModel):
         operations are rejected unless explicitly enabled (REQ-072).
     :ivar move_confidence_threshold: Minimum match confidence to classify a
         MOVE rather than DELETE+INSERT (REQ-070, REQ-071).
+    :ivar unresolved_presence_policy: Whether unresolved correspondence may be
+        reported as a presence defect (REQ-058, REQ-071).
     :ivar operation_thresholds: Additional per-operation confidence thresholds.
     """
 
@@ -251,6 +284,9 @@ class OperationProfile(StrictModel):
     version: str = Field(min_length=1)
     enabled_operations: frozenset[OperationType] = INITIAL_OPERATIONS
     move_confidence_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
+    unresolved_presence_policy: UnresolvedPresencePolicy = (
+        UnresolvedPresencePolicy.SUPPRESS_AMBIGUOUS_NODES
+    )
     operation_thresholds: tuple[Threshold, ...] = ()
 
     @model_validator(mode="after")

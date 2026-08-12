@@ -43,6 +43,17 @@ def test_unknown_profile_is_rejected() -> None:
     assert outcome.result is None
 
 
+def test_default_registry_contains_generic_tree_profiles() -> None:
+    registry = build_default_registry()
+
+    assert registry.known_ids() == (
+        "dita-map-v1",
+        "generic-json-v1",
+        "generic-xml-v1",
+        "generic-yaml-v1",
+    )
+
+
 def test_malformed_input_is_rejected() -> None:
     service = ComparisonJobService(build_default_registry())
     outcome = service.run(_request(source_content="<map><bad></map>"))
